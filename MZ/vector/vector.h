@@ -2,27 +2,29 @@
 #include <string>
 #include <cmath>
 #include <cstring>
-using namespace std;
+
 
 class vector_exception {
  private:
   const char *msg;
-  int len1, len2;
+  int par_n;
+  int par1;
+  int par2;
  public:
-  vector_exception(int len1, int len2): msg("Exception: addition of vectors of different lengths: "), len1(len1), len2(len2) {}
-  vector_exception(int len): msg("Exception: incorrect indexing: "), len1(len), len2(-1) {}
-  vector_exception(): msg("Exception: unknown exception"), len1(-1), len2(-1) {}
-  vector_exception(const vector_exception &other): msg(other.msg), len1(other.len1), len2(other.len2) {}
-  const char *get_msg() const {
-    return msg;
-  }
-  int get_first() const {
-    return len1;
-  }
-  int get_second() const {
-    return len2;
+  vector_exception(const char *msg, int par_n = 0, int par1 = 0, int par2 = 0): msg(msg), par_n(par_n), par1(par1), par2(par2) {}
+  vector_exception(const vector_exception &other): msg(other.msg), par_n(other.par_n), par1(other.par1), par2(other.par2) {}
+
+  void what(void) const {
+    if (par_n == 0) {
+      std::cerr << msg << std::endl;
+    }
+    if (par_n == 1)
+      std::cerr << msg << " " << par1 << std::endl;
+    if (par_n == 2)
+      std::cerr << msg << " " << par1 << " " << par2 << std::endl;
   }
 };
+
 template <typename T>
 class Vec {
  private:
@@ -30,9 +32,11 @@ class Vec {
   T *v;
   T *get_vec() const;
  public:
-  Vec(int len, T *cords);
-  int get_len() const;
+  Vec(int len, const T *cords);
   Vec (const Vec &v);
+  Vec(int len);
+
+  int get_len() const;
   void set(T arg, int coord);
   T get(int coord) const;
   T euc_norm() const;
@@ -61,17 +65,17 @@ class Vec {
   friend std::ostream& operator<<(std::ostream &os, const Vec<A> &op);
 
   Vec<T>& operator+=(const Vec<T> &op);
-  int operator^(const Vec<T> &op);
+  T operator^(const Vec<T> &op);
   ~Vec();
 };
 
 
 template <typename T>
-int Vec<T>::operator^(const Vec<T> &op) {
+T Vec<T>::operator^(const Vec<T> &op) {
   if (len != op.get_len()) {
-    //
+    throw vector_exception("Exception: multiplication of vectors of different lengths:", 2, len, op.len);
   }
-  int res = 0;
+  T res = 0;
   for (int i = 0; i < len; ++i) {
     res += (*this)[i]*op[i];
   }
@@ -81,7 +85,7 @@ int Vec<T>::operator^(const Vec<T> &op) {
 template <typename T>
 Vec<T>& Vec<T>::operator+=(const Vec<T> &op) {
   *this = *this + op;
-  return this;
+  return *this;
 }
 
 template <typename T>
@@ -113,7 +117,7 @@ const Vec<T> operator*(const Vec<T> &op, T lambda) {
 template <typename T>
 T& Vec<T>::operator[](int ind) {
   if (ind >= len || ind < 0) {
-    throw vector_exception(ind);
+    throw vector_exception("Exception: incorrect indexing:", 1, ind);
   }
   return v[ind];
 }
@@ -121,7 +125,7 @@ T& Vec<T>::operator[](int ind) {
 template <typename T>
 const T& Vec<T>::operator[](int ind) const {
   if (ind >= len || ind < 0) {
-    throw vector_exception(ind);
+    throw vector_exception("Exception: incorrect indexing:", 1, ind);
   }
   return v[ind];
 }
@@ -158,7 +162,7 @@ Vec<T>& Vec<T>::operator=(const Vec<T> &op) {
 template <typename T>
 const Vec<T> operator+(const Vec<T> &op1, const Vec<T> &op2) {
   if (op1.len != op2.len) {
-    throw vector_exception(op1.len, op2.len);
+    throw vector_exception("Exception: addition of vectors of different lengths:", 2, op1.len, op2.len);
   }
   Vec<T> res = op1;
   for (int i = 0; i < op1.get_len(); ++i) {
@@ -170,7 +174,7 @@ const Vec<T> operator+(const Vec<T> &op1, const Vec<T> &op2) {
 template <typename T>
 const Vec<T> operator-(const Vec<T> &op1, const Vec<T> &op2) {
   if (op1.len != op2.len) {
-    throw vector_exception(op1.len, op2.len);
+    throw vector_exception("Exception: addition of vectors of different lengths:", 2, op1.len, op2.len);
   }
   Vec<T> res = op1;
   for (int i = 0; i < op1.get_len(); ++i) {
@@ -181,9 +185,9 @@ const Vec<T> operator-(const Vec<T> &op1, const Vec<T> &op2) {
 
 
 template <typename T>
-Vec<T>::Vec(int len, T *cords) {
+Vec<T>::Vec(int len, const T *cords) {
   if (len <= 0) {
-    throw "Exception: length error";
+    throw vector_exception("Exception: length error", 0);
   }
   this->len = len;
   this->v = new T[len];
@@ -196,6 +200,25 @@ Vec<T>::Vec(int len, T *cords) {
       v[i] = 0;
     }
   }
+}
+
+template <typename T>
+Vec<T>::Vec(int len): len(len) {
+  if (len <= 0) {
+    throw vector_exception("Exception: length error", 0);
+  }
+  v = new T[len];
+  /*this->len = len;
+  this->v = new T[len];
+  if (cords != nullptr) {
+    for (int i = 0; i < len; i++) {
+      v[i] = cords[i];
+    }
+  } else {
+    for (int i = 0; i < len; i++) {
+      v[i] = 0;
+    }
+  }*/
 }
 
 template <typename T>
@@ -221,7 +244,8 @@ Vec<T>::Vec (const Vec<T> &v) {
 template <typename T>
 void Vec<T>::set(T arg, int coord) {
   if (coord < 0 || coord >= len){
-   throw "Exception: coordinate error in set()";
+    
+   throw vector_exception("Exception: coordinate error in set()", 0/*, 1, coord*/);
   }
   v[coord] = arg;
 }
@@ -229,7 +253,7 @@ void Vec<T>::set(T arg, int coord) {
 template <typename T>
 T Vec<T>::get(int coord) const {
   if (coord < 0 || coord >= len) {
-    throw "Exception: coordinate error in get()";
+    throw vector_exception("Exception: coordinate error in get()", 0/*, 1, coord*/);
   }
   return (this->v)[coord];
 }
@@ -263,6 +287,7 @@ void Vec<T>::print() const {
   }
   std::cout << std::endl;
 }
+
 template <typename T>
 Vec<T>::~Vec() {
   delete [] this->v;
